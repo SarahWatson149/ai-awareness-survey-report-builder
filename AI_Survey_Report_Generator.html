@@ -747,8 +747,22 @@ var SLIDES = (function (C) {
         });
         ctx.o.spotlight = save;
       }
-      if (ctx.o.callouts) takeaway(S, ctx, 'about', BOTTOM - 30, 30, th.navy);
       var ag = agencyList(ctx);
+      if (ag && ag.length) {
+        var agencySlice = ag.slice(0, 5), maxAgency = Math.max.apply(null, agencySlice.map(function (a) { return a.n; })) || 1, chartTop = ctx.v === 'hero' ? top + 122 : top + 166, chartHeight = Math.min(96, BOTTOM - chartTop - 6);
+        S.text(X0, chartTop - 18, 320, 16, 'Respondents by mission area', { size: 11, bold: true, color: th.ink });
+        S.chart(X0, chartTop, CW, chartHeight, {
+          type: 'bar',
+          labels: agencySlice.map(function (a) { return a.name; }),
+          values: agencySlice.map(function (a) { return a.n; }),
+          colors: agencySlice.map(function (a, i) { return i % 2 === 0 ? th.navy : th.green; }),
+          fmt: '#,##0',
+          max: Math.ceil(maxAgency * 1.18),
+          fontSize: 9,
+          labelW: 120
+        });
+      }
+      if (ctx.o.callouts) takeaway(S, ctx, 'about', BOTTOM - 30, 30, th.navy);
       S.notes = srcNote(ctx, 'Responses = rows in the export (' + C.fmtInt(D.N) + '). Window = first to last response date (' + D.days + ' days). ' + (ctx.meta.champions ? 'Champion count/coverage typed in Deck settings — verify. ' : 'Champion count not set — add it in Deck settings to show the coverage card. ') + (ag ? 'Agencies: ' + ag.map(function (a) { return a.name + ' ' + a.n; }).join(', ') + (D.agencies ? ' (from the export).' : ' (typed in Deck settings — verify).') : 'No agency column in this export.'));
     }
   };
