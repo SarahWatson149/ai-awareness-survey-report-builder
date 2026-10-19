@@ -733,7 +733,7 @@ var SLIDES = (function (C) {
         if (ctx.data.agencyCounts) S.text(chartX, chartTitleY + 25, chartW, 11, 'Column C: 490 entries; report total: ' + C.fmtInt(D.N) + '.', { size: 7.5, color: th.gold });
         S.chart(chartX, chartY, chartW, chartH, {
           type: 'bar',
-          labels: ag.map(function (a) { return a.name; }),
+          labels: ag.map(function (a) { var acronym = /\(([^()]+)\)\s*$/.exec(a.name); return acronym ? acronym[1] : a.name === 'Foreign Agricultural Service' ? 'FAS' : a.name; }),
           values: ag.map(function (a) { return a.n; }),
           colors: ag.map(function (a, i) { return i % 2 === 0 ? th.navy : th.green; }),
           fmt: '#,##0',
