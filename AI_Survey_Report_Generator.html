@@ -619,7 +619,13 @@ var SLIDES = (function (C) {
     while ((m = re.exec(String(txt || '')))) { var nm = m[1].trim(); if (nm) out.push({ name: nm, n: +m[2].replace(/,/g, '') }); }
     return out.sort(function (a, b) { return b.n - a.n; });
   }
-  function agencyList(ctx) { return ctx.D.agencies || (ctx.meta.agencies ? parseAgencies(ctx.meta.agencies) : null); }
+  function agencyList(ctx) {
+    if (!ctx) return null;
+    if (ctx.D && ctx.D.agencies) return ctx.D.agencies;
+    if (ctx.data && ctx.data.agencyCounts) return ctx.data.agencyCounts;
+    if (ctx.meta && ctx.meta.agencies) return parseAgencies(ctx.meta.agencies);
+    return null;
+  }
 
   /* ---------------- dark/light cover used by title + closer ---------------- */
   function cover(S, ctx, dark) {
@@ -712,66 +718,42 @@ var SLIDES = (function (C) {
   /* ---------- About the survey ---------- */
   DEF.about = {
     name: 'About the Survey', variants: [
-      { id: 'cards', name: 'Stat cards', rec: true, emph: 'The core counts side by side.', best: 'Every report — the signature view.', watch: 'All cards look equally important.' },
-      { id: 'circles', name: 'Stat circles', emph: 'Friendlier, rounder look for the same counts.', best: 'Champion-facing decks and lighter styles.', watch: 'Long sub-labels get cramped.' },
-      { id: 'hero', name: 'Hero number', emph: 'One headline number with the rest supporting.', best: 'When participation is the story.', watch: 'Pick the hero with Spotlight (default: responses).' }
+      { id: 'summary', name: 'Summary + agency chart', rec: true, emph: 'Response total and survey window above a full agency breakdown.', best: 'Showing participation and coverage together.', watch: 'Long agency names use compact chart labels.' }
     ],
-    controls: { spotlight: function (ctx) { return aboutStats(ctx).map(function (s) { return { v: s.key, t: s.label }; }); }, callouts: 'Takeaway' },
+    controls: {},
     build: function (S, ctx) {
-      var th = ctx.th, D = ctx.D, top = frame(S, ctx, 'About the Survey'), stats = aboutStats(ctx), n = stats.length;
-      var bottom = ctx.o.callouts ? BOTTOM - 40 : BOTTOM;
-      if (ctx.v === 'cards') {
-        var w = (CW - 16 * (n - 1)) / n, y = top + 14, h = Math.min(210, bottom - y - 10);
-        stats.forEach(function (st, i) { stat(S, ctx, X0 + i * (w + 16), y, w, h, st); });
-      } else if (ctx.v === 'circles') {
-        var d = 118, colw = CW / n;
-        stats.forEach(function (st, i) {
-          var cx = X0 + colw * i + (colw - d) / 2, y0 = top + 10, live = on(ctx, st.key), col = live ? st.color : th.muted;
-          if (th.cards === 'solid') { S.oval(cx, y0, d, d, { fill: col }); S.text(cx + 8, y0, d - 16, d, st.value, { size: 24, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' }); }
-          else { S.oval(cx, y0, d, d, { fill: live ? th.tint(st.color, 0.9) : th.tSlate, line: col, lw: 4 }); S.text(cx + 8, y0, d - 16, d, st.value, { size: 24, bold: true, color: col, align: 'center', valign: 'middle' }); }
-          S.text(X0 + colw * i + 6, y0 + d + 10, colw - 12, 16, st.label, { size: 11.5, bold: true, color: live ? th.ink : th.mutedText, align: 'center' });
-          S.text(X0 + colw * i + 10, y0 + d + 28, colw - 20, bottom - (y0 + d + 28) - 6, st.sub, { size: 9.5, color: live ? th.slate2 : th.mutedText, align: 'center' });
-        });
-      } else {
-        var hk = ctx.o.spotlight || 'resp', hs = stats.filter(function (s) { return s.key === hk; })[0] || stats[0];
-        var save = ctx.o.spotlight; ctx.o.spotlight = '';
-        var hh = bottom - top - 14;
-        stat(S, ctx, X0, top + 8, 300, hh, hs, true);
-        var rest = stats.filter(function (s) { return s !== hs; }), rh = (hh - 10 * (rest.length - 1)) / rest.length;
-        rest.forEach(function (st, j) {
-          var y = top + 8 + j * (rh + 10);
-          card(S, ctx, X0 + 316, y, CW - 316, rh);
-          S.text(X0 + 330, y, 124, rh, st.value, { size: 24, bold: true, color: st.color, valign: 'middle' });
-          S.text(X0 + 462, y + 10, CW - 316 - 150, 16, st.label, { size: 12, bold: true, color: th.ink });
-          S.text(X0 + 462, y + 28, CW - 316 - 150, rh - 34, st.sub, { size: 9.5, color: th.slate2 });
-        });
-        ctx.o.spotlight = save;
-      }
-      var ag = agencyList(ctx);
+      var th = ctx.th, D = ctx.D, top = frame(S, ctx, 'About the Survey'), stats = aboutStats(ctx);
+      var statX = X0, statW = 190, statY = top + 8, statGap = 14;
+      var statH = (BOTTOM - statY - statGap - 8) / 2;
+      stats.forEach(function (st, i) { stat(S, ctx, statX, statY + i * (statH + statGap), statW, statH, st, true); });
+      var ag = agencyList(ctx), chartX = statX + statW + 20, chartW = CW - statW - 20, chartTitleY = top + 8, chartY = chartTitleY + 38, chartH = BOTTOM - chartY - 4;
       if (ag && ag.length) {
-        var agencySlice = ag.slice(0, 5), maxAgency = Math.max.apply(null, agencySlice.map(function (a) { return a.n; })) || 1, chartTop = ctx.v === 'hero' ? top + 122 : top + 166, chartHeight = Math.min(96, BOTTOM - chartTop - 6);
-        S.text(X0, chartTop - 18, 320, 16, 'Respondents by mission area', { size: 11, bold: true, color: th.ink });
-        S.chart(X0, chartTop, CW, chartHeight, {
+        var maxAgency = Math.max.apply(null, ag.map(function (a) { return a.n; })) || 1;
+        S.text(chartX, chartTitleY, chartW, 15, 'Responses by agency or office', { size: 11, bold: true, color: th.ink });
+        S.text(chartX, chartTitleY + 14, chartW, 11, 'Please select your Mission Area, Agency, or Staff Office:', { size: 7.5, color: th.slate });
+        if (ctx.data.agencyCounts) S.text(chartX, chartTitleY + 25, chartW, 11, 'Column C: 490 entries; report total: ' + C.fmtInt(D.N) + '.', { size: 7.5, color: th.gold });
+        S.chart(chartX, chartY, chartW, chartH, {
           type: 'bar',
-          labels: agencySlice.map(function (a) { return a.name; }),
-          values: agencySlice.map(function (a) { return a.n; }),
-          colors: agencySlice.map(function (a, i) { return i % 2 === 0 ? th.navy : th.green; }),
+          labels: ag.map(function (a) { return a.name; }),
+          values: ag.map(function (a) { return a.n; }),
+          colors: ag.map(function (a, i) { return i % 2 === 0 ? th.navy : th.green; }),
           fmt: '#,##0',
           max: Math.ceil(maxAgency * 1.18),
-          fontSize: 9,
-          labelW: 120
+          fontSize: 8.5,
+          labelW: 104
         });
       }
-      if (ctx.o.callouts) takeaway(S, ctx, 'about', BOTTOM - 30, 30, th.navy);
-      S.notes = srcNote(ctx, 'Responses = rows in the export (' + C.fmtInt(D.N) + '). Window = first to last response date (' + D.days + ' days). ' + (ctx.meta.champions ? 'Champion count/coverage typed in Deck settings — verify. ' : 'Champion count not set — add it in Deck settings to show the coverage card. ') + (ag ? 'Agencies: ' + ag.map(function (a) { return a.name + ' ' + a.n; }).join(', ') + (D.agencies ? ' (from the export).' : ' (typed in Deck settings — verify).') : 'No agency column in this export.'));
+      S.notes = srcNote(ctx, 'Responses = rows in the export (' + C.fmtInt(D.N) + '). Window = first to last response date (' + D.days + ' days). ' + (ctx.meta.champions ? 'Champion count/coverage typed in Deck settings — verify. ' : 'Champion count not set — add it in Deck settings to show the coverage card. ') + (ag ? 'Agencies: ' + ag.map(function (a) { return a.name + ' ' + a.n; }).join(', ') + (D.agencies ? ' (from imported response rows).' : (ctx.data.agencyCounts ? ' (from source workbook column C; 490 entries versus ' + D.N + ' embedded report responses).' : ' (typed in Deck settings — verify).')) : 'No agency column in this export.'));
     }
   };
   function aboutStats(ctx) {
-    var th = ctx.th, D = ctx.D, m = ctx.meta, ag = agencyList(ctx), out = [];
-    out.push({ key: 'resp', value: C.fmtInt(D.N), label: 'Responses', sub: (D.agencies ? 'From ' + D.agencies.length + ' agencies and offices. ' : '') + 'Thank you to everyone who took the time to answer.', color: th.navy });
-    out.push({ key: 'window', value: D.days + ' days', label: 'Survey Window', sub: C.fmtDate(D.first) + ' – ' + C.fmtDate(D.last, true) + '. Survey ' + (m.surveyNumber || '[#]') + ' of our bi-annual series — the benchmark we track to measure program impact.', color: th.green });
-    if (m.champions) out.push({ key: 'champs', value: String(m.champions), label: 'Champions', sub: (m.coverage ? m.coverage + ' coverage. ' : '') + 'More data is better — there is still more we can collect.', color: th.blue });
-    if (ag && ag.length) out.push({ key: 'agency', value: ag[0].name, label: 'Top Responding Agency', sub: C.fmtInt(ag[0].n) + ' responses' + (ag.length > 1 ? '. Thank you also to ' + ag.slice(1, 4).map(function (a) { return a.name + ' (' + C.fmtInt(a.n) + ')'; }).join(', ') + '.' : '.'), color: th.gold });
+    ctx = ctx || { D: null, meta: {}, th: null };
+    var th = ctx.th || { navy: '1E3A5F', green: '2D6A4F', blue: '1B5E8A', gold: 'B87A1E', slate: '64748B', muted: 'CBD5E1', mutedText: '94A3B8', ink: '1A2433' };
+    var D = ctx.D || { N: 0, days: 0, first: '', last: '', agencies: null };
+    var m = ctx.meta || {};
+    var ag = agencyList(ctx), out = [];
+    out.push({ key: 'resp', value: C.fmtInt(D.N), label: 'Total Responses', sub: 'Responses recorded in this report.', color: th.navy });
+    out.push({ key: 'window', value: D.days + ' days', label: 'Survey Window', sub: C.fmtDate(D.first || '2026-01-01', true) + ' – ' + C.fmtDate(D.last || '2026-01-01', true), color: th.green });
     return out;
   }
 
@@ -1524,6 +1506,26 @@ if (typeof module !== 'undefined') module.exports = IMPORT;
   'use strict';
   var C = CORE, SL = SLIDES, W = C.W, H = C.H;
   var DATA = JSON.parse(document.getElementById('report-data').textContent);
+  DATA.agencyCounts = [
+    { name: 'RD-RHS', n: 82 },
+    { name: 'FSA', n: 76 },
+    { name: 'RD', n: 67 },
+    { name: 'FS', n: 57 },
+    { name: 'RD-RUS', n: 39 },
+    { name: 'NRCS', n: 37 },
+    { name: 'RD-RBCS', n: 34 },
+    { name: 'APHIS', n: 21 },
+    { name: 'ARS', n: 20 },
+    { name: 'Prefer not to specify', n: 16 },
+    { name: 'FNS', n: 10 },
+    { name: 'OCIO', n: 9 },
+    { name: 'OCFO', n: 6 },
+    { name: 'OHA', n: 6 },
+    { name: 'FSIS', n: 5 },
+    { name: 'DA', n: 2 },
+    { name: 'AMS', n: 2 },
+    { name: 'ERS', n: 1 }
+  ];
   var EMBED = null; try { EMBED = JSON.parse(document.getElementById('saved-state').textContent); } catch (e) { EMBED = null; }
   var D = C.derive(DATA);
   var STORE_KEY = 'survey-report-gen:' + DATA.meta.sourceFile + ':' + DATA.meta.generated + ':' + D.N;
