@@ -1792,9 +1792,17 @@ if (typeof module !== 'undefined') module.exports = IMPORT;
         inc.forEach(function (inst) { var sc = buildScene(inst); mh.innerHTML = ''; renderScene(sc, mh, {}); C.sceneToPptx(pres, sc, state.textScale || 1); });
         mh.innerHTML = '';
         var fn = 'AI_Champions_Survey_Insights_v' + ((state.meta.surveyNumber || '').replace(/[^\w-]/g, '') || 'X') + (state.aud === 'leadership' ? '_Leadership' : '') + '.pptx';
-        pres.writeFile({ fileName: fn }).then(function () { toast('PowerPoint saved (' + inc.length + ' slides). This is an AI-assisted draft — review every number and quote before sharing.', 7000); });
-      } catch (err) { console.error(err); toast('Export failed: ' + err.message, 7000); }
-      btn.disabled = false; btn.textContent = 'Export PowerPoint';
+        pres.writeFile({ fileName: fn }).then(function () {
+          toast('PowerPoint saved (' + inc.length + ' slides). This is an AI-assisted draft — review every number and quote before sharing.', 7000);
+        }).catch(function (err) {
+          console.error(err); toast('Export failed: ' + err.message, 7000);
+        }).then(function () {
+          btn.disabled = false; btn.textContent = 'Export PowerPoint';
+        });
+      } catch (err) {
+        console.error(err); toast('Export failed: ' + err.message, 7000);
+        btn.disabled = false; btn.textContent = 'Export PowerPoint';
+      }
     }, 30);
   }
 
