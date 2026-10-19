@@ -159,7 +159,6 @@ pre.notes{white-space:pre-wrap;font:12px/1.5 var(--font);color:var(--ink2);backg
   <div class="brand"><b>AI Awareness Survey Report Generator</b><span id="metaLine"></span></div>
   <span class="draftflag" title="AI output must be reviewed and verified by a person before it is used or shared.">AI-assisted draft &middot; verify before sharing</span>
   <div class="spacer"></div>
-  <div class="aud"><span>Audience</span><div class="seg" id="audSeg"><button data-v="champions" class="on">Champions</button><button data-v="leadership">Leadership</button></div></div>
   <button class="ghost" id="btnImport" title="Load a new survey export and build a fresh report in this page">New report from survey</button>
   <button class="ghost" id="btnSave" title="Download a copy of this file with your layouts and edits built in">Save copy</button>
   <button class="ghost" id="btnPrint" title="Print, or choose Save as PDF in the print dialog">Print / PDF</button>
@@ -1541,6 +1540,7 @@ if (typeof module !== 'undefined') module.exports = IMPORT;
   var pick = [EMBED, local].filter(function (s) { return s && s.v === 1 && s.slides; }).sort(function (a, b) { return (b.savedAt || 0) - (a.savedAt || 0); })[0];
   if (pick) { pick.slides = pick.slides.filter(function (s) { return SL.DEF[s.type]; }); if (!pick.slides.length) pick = null; }
   if (pick) { state = pick; state.slides.forEach(function (s) { var n = +String(s.id).split('-').pop(); if (n > uid) uid = n; }); }
+  state.aud = 'champions';
   function save() { state.savedAt = Date.now(); try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { } }
 
   function theme() { return C.makeTheme(state); }
@@ -1936,8 +1936,6 @@ if (typeof module !== 'undefined') module.exports = IMPORT;
 
   function init() {
     if (window.__QA) { runQA(window.__QA); return; }
-    $('#audSeg').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; state.aud = b.getAttribute('data-v'); this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); renderAll(); };
-    $('#audSeg').querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-v') === state.aud); });
     $('#btnImport').onclick = openImport;
     $('#btnPptx').onclick = exportPptx; $('#btnPrint').onclick = printDeck; $('#btnSave').onclick = saveCopy;
     $('#btnResetAll').onclick = function () { if (confirm('Reset all slides, styles, and text edits to the defaults?')) { state = defaultState(); renderAll(); } };
