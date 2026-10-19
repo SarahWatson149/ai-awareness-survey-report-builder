@@ -730,7 +730,6 @@ var SLIDES = (function (C) {
         var maxAgency = Math.max.apply(null, ag.map(function (a) { return a.n; })) || 1;
         S.text(chartX, chartTitleY, chartW, 15, 'Responses by agency or office', { size: 11, bold: true, color: th.ink });
         S.text(chartX, chartTitleY + 14, chartW, 11, 'Please select your Mission Area, Agency, or Staff Office:', { size: 7.5, color: th.slate });
-        if (ctx.data.agencyCounts) S.text(chartX, chartTitleY + 25, chartW, 11, 'Column C: 490 entries; report total: ' + C.fmtInt(D.N) + '.', { size: 7.5, color: th.gold });
         S.chart(chartX, chartY, chartW, chartH, {
           type: 'bar',
           labels: ag.map(function (a) { var acronym = /\(([^()]+)\)\s*$/.exec(a.name); return acronym ? acronym[1] : a.name === 'Foreign Agricultural Service' ? 'FAS' : a.name; }),
@@ -742,7 +741,7 @@ var SLIDES = (function (C) {
           labelW: 104
         });
       }
-      S.notes = srcNote(ctx, 'Responses = rows in the export (' + C.fmtInt(D.N) + '). Window = first to last response date (' + D.days + ' days). ' + (ctx.meta.champions ? 'Champion count/coverage typed in Deck settings — verify. ' : 'Champion count not set — add it in Deck settings to show the coverage card. ') + (ag ? 'Agencies: ' + ag.map(function (a) { return a.name + ' ' + a.n; }).join(', ') + (D.agencies ? ' (from imported response rows).' : (ctx.data.agencyCounts ? ' (from source workbook column C; 490 entries versus ' + D.N + ' embedded report responses).' : ' (typed in Deck settings — verify).')) : 'No agency column in this export.'));
+      S.notes = srcNote(ctx, 'Responses = rows in the export (' + C.fmtInt(D.N) + '). Window = first to last response date (' + D.days + ' days). ' + (ctx.meta.champions ? 'Champion count/coverage typed in Deck settings — verify. ' : 'Champion count not set — add it in Deck settings to show the coverage card. ') + (ag ? 'Agencies: ' + ag.map(function (a) { return a.name + ' ' + a.n; }).join(', ') + (D.agencies ? ' (from the selected worksheet response rows).' : ' (typed in Deck settings — verify).') : 'No agency column in the selected worksheet.'));
     }
   };
   function aboutStats(ctx) {
@@ -1313,11 +1312,12 @@ var IMPORT = (function (C) {
     SPEC.forEach(function (s) { for (var i = 0; i < h.length; i++) if (!used[i] && s[1].test(h[i])) { map[s[0]] = i; used[i] = 1; break; } });
     return { map: map, missing: REQUIRED.filter(function (k) { return map[k] == null; }) };
   }
-  function pickSheet(sheets) {
-    var best = null;
-    sheets.forEach(function (s) { (s.rows || []).slice(0, 5).forEach(function (r, i) { if (!r) return; var mc = mapColumns(r); if (!mc.missing.length && (!best || s.rows.length > best.sheet.rows.length)) best = { sheet: s, headerRow: i, map: mc.map }; }); });
-    return best;
+  function matchingSheets(sheets) {
+    var matches = [];
+    sheets.forEach(function (s) { (s.rows || []).slice(0, 5).forEach(function (r, i) { if (!r) return; var mc = mapColumns(r); if (!mc.missing.length) matches.push({ sheet: s, headerRow: i, map: mc.map }); }); });
+    return matches;
   }
+  function pickSheet(sheets) { var matches = matchingSheets(sheets); return matches.length === 1 ? matches[0] : null; }
   function bestMissing(sheets) {
     var best = null; sheets.forEach(function (s) { (s.rows || []).slice(0, 5).forEach(function (r) { if (!r) return; var mc = mapColumns(r); if (!best || mc.missing.length < best.length) best = mc.missing; }); });
     return best || REQUIRED;
@@ -1492,7 +1492,7 @@ var IMPORT = (function (C) {
     return n;
   }
 
-  return { readXlsx: readXlsx, pickSheet: pickSheet, bestMissing: bestMissing, mapColumns: mapColumns, draft: draft, compose: compose, writeNarrative: writeNarrative, notesFor: notesFor, THEME_LIB: THEME_LIB, THEME_RULES: THEME_RULES, Q: Q };
+  return { readXlsx: readXlsx, pickSheet: pickSheet, matchingSheets: matchingSheets, bestMissing: bestMissing, mapColumns: mapColumns, draft: draft, compose: compose, writeNarrative: writeNarrative, notesFor: notesFor, THEME_LIB: THEME_LIB, THEME_RULES: THEME_RULES, Q: Q };
 })(CORE);
 if (typeof module !== 'undefined') module.exports = IMPORT;
 </script>
@@ -1505,26 +1505,6 @@ if (typeof module !== 'undefined') module.exports = IMPORT;
   'use strict';
   var C = CORE, SL = SLIDES, W = C.W, H = C.H;
   var DATA = JSON.parse(document.getElementById('report-data').textContent);
-  DATA.agencyCounts = [
-    { name: 'RD-RHS', n: 82 },
-    { name: 'FSA', n: 76 },
-    { name: 'RD', n: 67 },
-    { name: 'FS', n: 57 },
-    { name: 'RD-RUS', n: 39 },
-    { name: 'NRCS', n: 37 },
-    { name: 'RD-RBCS', n: 34 },
-    { name: 'APHIS', n: 21 },
-    { name: 'ARS', n: 20 },
-    { name: 'Prefer not to specify', n: 16 },
-    { name: 'FNS', n: 10 },
-    { name: 'OCIO', n: 9 },
-    { name: 'OCFO', n: 6 },
-    { name: 'OHA', n: 6 },
-    { name: 'FSIS', n: 5 },
-    { name: 'DA', n: 2 },
-    { name: 'AMS', n: 2 },
-    { name: 'ERS', n: 1 }
-  ];
   var EMBED = null; try { EMBED = JSON.parse(document.getElementById('saved-state').textContent); } catch (e) { EMBED = null; }
   var D = C.derive(DATA);
   var STORE_KEY = 'survey-report-gen:' + DATA.meta.sourceFile + ':' + DATA.meta.generated + ':' + D.N;
@@ -1835,21 +1815,32 @@ if (typeof module !== 'undefined') module.exports = IMPORT;
   function openImport() {
     var m = $('#importer');
     m.innerHTML = '<div class="gbox ibox"><div class="gh"><div><div class="gt">New report from a survey export</div><div class="gs">The file is read here in your browser — nothing is uploaded or sent anywhere.</div></div><button class="ghost" id="iClose">Close ✕</button></div>' +
-      '<div class="istep"><ol class="ihow"><li>Choose the latest AI Awareness Survey export (.xlsx).</li><li>Review what the importer found: comment themes, quotes, and the four insight cards are drafted with keyword rules, so check them.</li><li>Build the report. It replaces the current data in this page; use <b>Save copy</b> afterward to keep it.</li></ol>' +
+      '<div class="istep"><ol class="ihow"><li>Choose the survey export (.xlsx), then choose a worksheet if the workbook has more than one matching sheet.</li><li>Review what the importer found: comment themes, quotes, and the insight cards are drafted with keyword rules, so check them.</li><li>Build the report. It replaces the current data in this page; use <b>Save copy</b> afterward to keep it.</li></ol>' +
       '<div class="two" style="max-width:560px"><div><label class="lbl">Survey export</label><input type="file" id="iFile" accept=".xlsx"></div><div><label class="lbl">Reporting period <span class="sub">optional</span></label><input id="iPeriod" placeholder="e.g. August 2026"></div></div>' +
       '<div class="inote">Every number is computed from this file alone — each survey stands on its own as a baseline. Do not load files marked CUI or containing personal data beyond survey answers; if the file contains a CUI marking, the importer stops — handle it through Steampunk’s approved, secure channels.</div><div id="iMsg"></div></div></div>';
     m.classList.add('open');
     $('#iClose').onclick = function () { m.classList.remove('open'); };
+    function buildFromSheet(p, file, sheets, msg) {
+      var dr = IMPORT.draft(p.sheet, p.headerRow, p.map, { period: $('#iPeriod').value.trim(), sourceFile: file.name, today: new Date().toISOString().slice(0, 10), sheetNames: sheets.map(function (s) { return s.name; }) });
+      if (dr.cui) { msg.innerHTML = '<div class="warn"><b>Stopped: this file contains a CUI marking.</b> Don’t process it here. Handle it through Steampunk’s approved, secure channels.</div>'; return; }
+      if (!dr.responses.length) { msg.innerHTML = '<div class="warn">No survey responses were found in worksheet “' + esc(p.sheet.name) + '”.</div>'; return; }
+      dr.insightSel = null; review(dr);
+    }
     $('#iFile').onchange = function () {
       var file = this.files[0]; if (!file) return; var msg = $('#iMsg'); msg.innerHTML = '<p>Reading ' + esc(file.name) + '…</p>';
       if (typeof JSZip === 'undefined') { msg.innerHTML = '<div class="warn">The file reader did not load.</div>'; return; }
       file.arrayBuffer().then(function (buf) { return IMPORT.readXlsx(buf, JSZip); }).then(function (sheets) {
-        var p = IMPORT.pickSheet(sheets);
-        if (!p) { msg.innerHTML = '<div class="warn">Couldn’t find the survey questions. Missing: ' + esc(IMPORT.bestMissing(sheets).join(', ')) + '. The importer looks for headers containing “skill level”, “How often do you use AI”, “Which tasks”, “What barriers”, “type of support”, and the five 1–5 rating questions.</div>'; return; }
-        var dr = IMPORT.draft(p.sheet, p.headerRow, p.map, { period: $('#iPeriod').value.trim(), sourceFile: file.name, today: new Date().toISOString().slice(0, 10), sheetNames: sheets.map(function (s) { return s.name; }) });
-        if (dr.cui) { msg.innerHTML = '<div class="warn"><b>Stopped: this file contains a CUI marking.</b> Don’t process it here. Handle it through Steampunk’s approved, secure channels.</div>'; return; }
-        if (!dr.responses.length) { msg.innerHTML = '<div class="warn">No survey responses were found.</div>'; return; }
-        dr.insightSel = null; review(dr);
+        var candidates = IMPORT.matchingSheets(sheets);
+        if (!candidates.length) { msg.innerHTML = '<div class="warn">Couldn’t find the survey questions. Missing: ' + esc(IMPORT.bestMissing(sheets).join(', ')) + '. The importer looks for headers containing “skill level”, “How often do you use AI”, “Which tasks”, “What barriers”, “type of support”, and the five 1–5 rating questions.</div>'; return; }
+        if (candidates.length === 1) { buildFromSheet(candidates[0], file, sheets, msg); return; }
+        var options = candidates.map(function (p, i) {
+          var dataRows = (p.sheet.rows || []).slice(p.headerRow + 1).filter(function (row) { return row && row.some(function (v) { return v != null && String(v).trim(); }); }).length;
+          return '<option value="' + i + '">' + esc(p.sheet.name) + ' — ' + C.fmtInt(dataRows) + ' data rows (' + C.fmtInt(p.sheet.rows.length) + ' worksheet rows)</option>';
+        }).join('');
+        msg.innerHTML = '<div class="warn">This workbook has multiple worksheets with survey headers. Choose which worksheet to use; only its rows will be included.</div><label class="lbl" for="iSheet">Survey worksheet</label><select id="iSheet" style="max-width:460px"><option value="">Choose a worksheet</option>' + options + '</select> <button class="primary" id="iUseSheet" disabled>Continue with worksheet</button>';
+        var sheetSelect = $('#iSheet'), useSheet = $('#iUseSheet');
+        sheetSelect.onchange = function () { useSheet.disabled = this.value === ''; };
+        useSheet.onclick = function () { if (sheetSelect.value !== '') buildFromSheet(candidates[+sheetSelect.value], file, sheets, msg); };
       }).catch(function (e) { console.error(e); msg.innerHTML = '<div class="warn">Couldn’t read that file: ' + esc(e.message) + '</div>'; });
     };
   }
